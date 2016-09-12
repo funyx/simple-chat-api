@@ -1,9 +1,9 @@
 module.exports = {
 
   // Join a chat room -- this is bound to 'post /room/:roomId/users'
-  'join': function(req, res, next) {
+  join: function(req, res, next) {
     // Get the ID of the room to join
-    var roomId = req.param('roomId');
+    var roomId = req.param('uid');
     // Subscribe the requesting socket to the "message" context,
     // so it'll get notified whenever Room.message() is called
     // for this room.
@@ -15,9 +15,9 @@ module.exports = {
   },
 
   // Leave a chat room -- this is bound to 'delete /room/:roomId/users'
-  'leave': function(req, res, next) {
+  leave: function(req, res, next) {
     // Get the ID of the room to join
-    var roomId = req.param('roomId');
+    var roomId = req.param('uid');
     // Unsubscribe the requesting socket from the "message" context
     Room.unsubscribe(req, roomId, ['message']);
     // Continue processing the route, allowing the blueprint

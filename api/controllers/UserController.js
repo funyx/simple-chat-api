@@ -5,10 +5,12 @@ module.exports = {
     var identifier = req.param('identifier'),
         password = req.param('password');
     User.findOne({username:identifier})
+    .populate('rooms')
     .exec(function(err, user){
       if (err) return res.negotiate(err);
       if(!user){
         User.findOne({email:identifier})
+        .populate('rooms')
         .exec(function(err, user){
           if (err) return res.negotiate(err);
           if (!user) return res.ok({error:true});

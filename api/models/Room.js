@@ -16,8 +16,8 @@ module.exports = {
   // to the 'message' context explicitly.
   autosubscribe: ['destroy', 'update', 'add:users', 'remove:users'],
   attributes: {
-
 		name: 'string',
+    uid: 'string',
 		users: {
 			collection: 'user',
 			via: 'rooms'
