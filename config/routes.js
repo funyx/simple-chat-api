@@ -35,8 +35,9 @@ module.exports.routes = {
   // '/': {
   //   view: 'homepage'
   // },
-  'get /auth/identifier/:identifier': 'UserController.identifier',
+  // 'get /auth/identifier/:identifier': 'UserController.identifier',
   'post /auth/login': 'UserController.login',
+  'post /auth/autoLogin': 'UserController.autoLogin',
   'post /auth/register': 'UserController.register',
   'post /room/:roomId/users': 'RoomController.join',
   'delete /room/:roomId/users': 'RoomController.leave'

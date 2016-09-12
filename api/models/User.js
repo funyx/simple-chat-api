@@ -16,12 +16,19 @@ module.exports = {
   autosubscribe: ['destroy', 'update'],
   attributes: {
 
-    username: 'string',
+    username: {
+      type:'string',
+      unique:true
+    },
+    email: {
+      type:'string',
+      unique:true
+    },
     public_name: 'string',
-    email: 'string',
     password: 'string',
     timezone: 'string',
     avatar: 'string',
+    is_online: 'boolean',
     rooms: {
       collection: 'room',
       via: 'users',
@@ -32,6 +39,11 @@ module.exports = {
 
   // Hook that gets called after the default publishUpdate is run.
   // We'll use this to tell all public chat rooms about the user update.
+  toJSON: function () {
+      var obj = this.toObject();
+      delete obj.password;
+      return obj;
+  },
   afterPublishUpdate: function(id, changes, req, options) {
     if((options.previous.username != changes.username)
     || (options.previous.email != changes.email)

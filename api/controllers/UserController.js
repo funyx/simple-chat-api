@@ -4,6 +4,7 @@ module.exports = {
   login : function(req, res){
     var identifier = req.param('identifier'),
         password = req.param('password');
+    var USER = {error:true,error_msg:'Wrong Cridentials'};
     User.findOne({username:identifier})
     .populate('rooms')
     .exec(function(err, user){
@@ -13,51 +14,68 @@ module.exports = {
         .populate('rooms')
         .exec(function(err, user){
           if (err) return res.negotiate(err);
-          if (!user) return res.ok({error:true});
-          user.error = false;
-          return res.ok(user);
+          if (user){
+            USER = user.toJSON();
+            USER['error'] = false;
+          }
         })
       }else{
-        user.error = false;
-        return res.ok(user);
+        USER = user.toJSON();
+        USER['error'] = false;
       }
-    })
+    });
+    // check password
+    if(USER.password === password){
+      return res.ok(USER);
+    }else{
+      USER['error'] = true;
+      USER['error_msg'] = 'Wrong Password';
+      return res.ok(USER);
+    }
+  },
+  autoLogin : function(req, res){
+    var identifier = req.param('identifier');
+    var USER = {error:true};
+    User.findOne({username:identifier})
+    .populate('rooms')
+    .exec(function(err, user){
+      if (err) return res.negotiate(err);
+      if(!user){
+        User.findOne({email:identifier})
+        .populate('rooms')
+        .exec(function(err, user){
+          if (err) return res.negotiate(err);
+          if (user){
+            USER = user.toJSON();
+            USER.error = false;
+          }
+        })
+      }else{
+        USER = user.toJSON();
+        USER.error = false;
+      }
+    });
+    res.ok(USER);
   },
   register : function(req, res){
     var username = req.param('username'),
         email = req.param('email'),
+        public_name = req.param('public_name'),
         password = req.param('password'),
         timezone = req.param('timezone');
 
     User.create({
       username: username,
-      public_name: username,
+      public_name: public_name,
       email: email,
       password: password,
       timezone: timezone,
       avatar: '',
+      is_online: true
     }).exec(function (err, newUser) {
       // If there was an error, we negotiate it.
       if (err) return res.negotiate(err);
-      return res.ok(newUser);
-    })
-  },
-  identifier : function(req, res){
-    var identifier = req.param('identifier');
-
-    User.findOne({username:identifier})
-    .exec(function(err, user){
-      if (err) return res.negotiate(err);
-      if(!user){
-        User.findOne({email:identifier})
-        .exec(function(err, user){
-          if (err) return res.negotiate(err);
-          if (!user) return res.ok({exists:false});
-          return res.ok({exists:true});
-        })
-      }else{
-        return res.ok({exists:true});
-      }
+      return res.ok(newUser.toJSON());
     })
   },
   // Create a new user and tell the world about them.
