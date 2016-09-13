@@ -1,9 +1,27 @@
+var set_online = function(username){
+  User.update({username:username},{is_online:true}).exec(function afterwards(err, updated){
+    if (err) {
+      console.log(`error updating ${username}->is_online`, err);
+      return;
+    }
+    console.log(`${username} is now online`);
+  });
+
+}
+var handle = function(req,user){
+  var socketId = sails.sockets.getId(req);
+  req.session.user = user;
+  req.session.user['sockets'] = [socketId];
+  User.subscribe(req, user, 'SYS_MESSAGE');
+  User.watch(req);
+  Room.watch(req);
+  User.publishCreate(user, req);
+}
 module.exports = {
   login : function(req, res){
     var identifier = req.param('identifier'),
         password = req.param('password'),
-        WRONG_PASS = {error:true,error_msg:'Wrong Cridentials'},
-        socketId = sails.sockets.getId(req);
+        WRONG_PASS = {error:true,error_msg:'Wrong Cridentials'};
 
     User.findOne({username:identifier})
     .populate('rooms')
@@ -16,20 +34,8 @@ module.exports = {
           if (err) return res.negotiate(err);
           if (user){
             if(user.password === password){
-              req.session.user = user;
-              req.session.user['sockets'] = [socketId];
-              // Subscribe the connected socket to custom messages regarding the user.
-              // While any socket subscribed to the user will receive messages about the
-              // user changing their name or being destroyed, ONLY this particular socket
-              // will receive "message" events.  This allows us to send private messages
-              // between users.
-              User.subscribe(req, user, 'SYS_MESSAGE');
-              // Get updates about users being created
-              User.watch(req);
-              // Get updates about rooms being created
-              Room.watch(req);
-              // publish the event
-              User.publishCreate(user, req);
+              handle(req,user);
+              set_online(user.username);
               return res.ok(user.toJSON());
             }else{
               return res.ok(WRONG_PASS);
@@ -38,20 +44,8 @@ module.exports = {
         })
       }else{
         if(user.password === password){
-          req.session.user = user;
-          req.session.user['sockets'] = [socketId];
-          // Subscribe the connected socket to custom messages regarding the user.
-          // While any socket subscribed to the user will receive messages about the
-          // user changing their name or being destroyed, ONLY this particular socket
-          // will receive "message" events.  This allows us to send private messages
-          // between users.
-          User.subscribe(req, user, 'SYS_MESSAGE');
-          // Get updates about users being created
-          User.watch(req);
-          // Get updates about rooms being created
-          Room.watch(req);
-          // publish the event
-          User.publishCreate(user, req);
+          handle(req,user);
+          set_online(user.username);
           return res.ok(user.toJSON());
         }else{
           return res.ok(WRONG_PASS);
@@ -61,8 +55,7 @@ module.exports = {
   },
   autoLogin : function(req, res){
     var identifier = req.param('identifier'),
-        USER = {error:true},
-        socketId = sails.sockets.getId(req);
+        USER = {error:true};
 
     User.findOne({username:identifier})
     .populate('rooms')
@@ -74,42 +67,14 @@ module.exports = {
         .exec(function(err, user){
           if (err) return res.negotiate(err);
           if (user){
-            req.session.user = user;
-            req.session.user['sockets'] = [socketId];
-            USER = user.toJSON();
-            USER.error = false;
-            // Subscribe the connected socket to custom messages regarding the user.
-            // While any socket subscribed to the user will receive messages about the
-            // user changing their name or being destroyed, ONLY this particular socket
-            // will receive "message" events.  This allows us to send private messages
-            // between users.
-            User.subscribe(req, user, 'SYS_MESSAGE');
-            // Get updates about users being created
-            User.watch(req);
-            // Get updates about rooms being created
-            Room.watch(req);
-            // publish the event
-            User.publishCreate(user, req);
+            handle(req,user);
+            set_online(user.username);
             res.ok(USER);
           }
         })
       }else{
-        req.session.user = user;
-        req.session.user['sockets'] = [socketId];
-        USER = user.toJSON();
-        USER.error = false;
-        // Subscribe the connected socket to custom messages regarding the user.
-        // While any socket subscribed to the user will receive messages about the
-        // user changing their name or being destroyed, ONLY this particular socket
-        // will receive "message" events.  This allows us to send private messages
-        // between users.
-        User.subscribe(req, user, 'SYS_MESSAGE');
-        // Get updates about users being created
-        User.watch(req);
-        // Get updates about rooms being created
-        Room.watch(req);
-        // publish the event
-        User.publishCreate(user, req);
+        handle(req,user);
+        set_online(user.username);
         res.ok(USER);
       }
     });
@@ -119,8 +84,7 @@ module.exports = {
         email = req.param('email'),
         public_name = req.param('public_name'),
         password = req.param('password'),
-        timezone = req.param('timezone'),
-        socketId = sails.sockets.getId(req);
+        timezone = req.param('timezone');
 
     User.create({
       username: username,
@@ -133,22 +97,18 @@ module.exports = {
     }).exec(function (err, newUser) {
       // If there was an error, we negotiate it.
       if (err) return res.negotiate(err);
-      req.session.user = user;
-      req.session.user['sockets'] = [socketId];
-      // Subscribe the connected socket to custom messages regarding the user.
-      // While any socket subscribed to the user will receive messages about the
-      // user changing their name or being destroyed, ONLY this particular socket
-      // will receive "message" events.  This allows us to send private messages
-      // between users.
-      User.subscribe(req, user, 'SYS_MESSAGE');
-      // Get updates about users being created
-      User.watch(req);
-      // Get updates about rooms being created
-      Room.watch(req);
-      // publish the event
-      User.publishCreate(user, req);
+      handle(req,newUser);
+      set_online(user.username);
       return res.ok(newUser.toJSON());
     })
+  },
+
+  online: function(req,res){
+    User.find({is_online:true})
+        .exec(function(err,users){
+      if(err)return res.negotiate(err);
+      return res.ok(users);
+    });
   },
   // Create a new user and tell the world about them.
   // This will be called every time a socket connects, so that each socket

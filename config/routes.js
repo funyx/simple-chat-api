@@ -39,6 +39,8 @@ module.exports.routes = {
   'post /auth/login': 'UserController.login',
   'post /auth/autoLogin': 'UserController.autoLogin',
   'post /auth/register': 'UserController.register',
+  'post /users/online': 'UserController.online',
+
   'post /room/:roomId/users': 'RoomController.join',
   'delete /room/:roomId/users': 'RoomController.leave'
 
