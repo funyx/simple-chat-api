@@ -5,6 +5,7 @@
   "description": "a Sails application",
   "keywords": [],
   "dependencies": {
+    "guid": "0.0.12",
     "include-all": "~0.1.6",
     "lodash": "^4.15.0",
     "rc": "1.0.1",

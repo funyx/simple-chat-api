@@ -125,31 +125,30 @@ module.exports.sockets = {
   ***************************************************************************/
   // This custom onDisconnect function will be run each time a socket disconnects
   afterDisconnect: function(session, socket, cb) {
-
-      try {
+      // once external (not local memory) storage/db is used for storing sessions this will be resolved
+      // sails doesnt support session data / sockets properly while using memory as a storage
+      // var sessionId = socket.handshake.headers.cookie.replace('sails.sid=','');
+      // sails.session.get(sessionId,function(s){
+      //     console.log('byebye',sessionId,s);
+      // });
+      // try {
         // Look up the user ID using the connected socket
-        var userId = session.users[sails.sockets.id(socket)].id;
-
-        // Get the user instance
-        User.findOne(userId).populate('rooms').exec(function(err, user) {
-
-          if (err) {return cb();}
-          // Destroy the user instance
-          User.destroy({id:user.id}).exec(function(err){
-
-            if (err) {return cb();}
-            // Publish the destroy event to every socket subscribed to this user instance
-            User.publishDestroy(user.id, null, {previous: user});
-
-            return cb();
-
-          });
-
-        });
-      } catch (e) {
-        console.log("Error on socket disconnect: ", e);
+      //   var userId = session.user.id;
+      //   var socketId = session.socketId[sails.sockets.getId(socket)];
+      //   // Get the user instance
+      //   User.update({id:userId},{is_online:false}).exec(function(err, user) {
+      //
+      //     if (err) {return cb();}
+      //     // emit user offline
+      //     sails.sockets.blast('user_logged_in', {
+      //       msg: 'User #' + u.id + ' just logged in.',
+      //       user: u
+      //     }, req);
+      //   });
+      // } catch (e) {
+      //   console.log("Error on socket disconnect: ", e);
         return cb();
-      }
+      // }
 
   }
 

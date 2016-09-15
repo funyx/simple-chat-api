@@ -1,13 +1,3 @@
-var set_online = function(username){
-  User.update({username:username},{is_online:true}).exec(function afterwards(err, updated){
-    if (err) {
-      console.log(`error updating ${username}->is_online`, err);
-      return;
-    }
-    console.log(`${username} is now online`);
-  });
-
-}
 var handle = function(req,user){
   var socketId = sails.sockets.getId(req);
   req.session.user = user;
@@ -17,40 +7,89 @@ var handle = function(req,user){
   Room.watch(req);
   User.publishCreate(user, req);
 }
+var set_online = function(req,user){
+  User.update({username:user.username},{is_online:true}).exec(function afterwards(err, updated){
+    if (err) {
+      console.log(`error updating ${u.username}->is_online`, err);
+      return;
+    }
+    var u = Object.assign({},user);
+    delete u.password;
+    sails.sockets.blast('user_logged_in', {
+      msg: 'User #' + u.id + ' just logged in.',
+      user: u
+    }, req);
+    console.log(`${u.username} is now online`);
+  });
+
+}
+var load_rooms = function(u){
+  var uids=[];
+  if(u.rooms.length){
+    for(var i in u.rooms){
+      if(u.rooms[i].uid) uids.push(u.rooms[i].uid);
+    }
+    console.log(u.username,'has rooms',uids);
+  }else{
+    console.log(u.username,'has no rooms');
+  }
+
+  return Room.find({uid:uids}).populate('users')
+};
 module.exports = {
   login : function(req, res){
     var identifier = req.param('identifier'),
         password = req.param('password'),
         WRONG_PASS = {error:true,error_msg:'Wrong Cridentials'};
-
     User.findOne({username:identifier})
     .populate('rooms')
-    .exec(function(err, user){
-      if (err) return res.negotiate(err);
+    .then(function(user){
       if(!user){
         User.findOne({email:identifier})
         .populate('rooms')
-        .exec(function(err, user){
-          if (err) return res.negotiate(err);
-          if (user){
-            if(user.password === password){
-              handle(req,user);
-              set_online(user.username);
-              return res.ok(user.toJSON());
+          .then(function(user){
+            if (user){
+              if(user.password === password){
+                handle(req,user);
+                set_online(req,user);
+                load_rooms(user)
+                  .then(function(rooms){
+                    var r = rooms;
+                    var u = Object.assign({},user);
+                    delete u.password;
+                    delete u.rooms;
+                    u['rooms'] = r;
+                    return res.ok(u);
+                  });
+              }else{
+                return res.ok(WRONG_PASS);
+              }
             }else{
               return res.ok(WRONG_PASS);
             }
-          }
-        })
+          })
+          .catch(function(err){
+            return res.negotiate(err);
+          });
       }else{
         if(user.password === password){
           handle(req,user);
-          set_online(user.username);
-          return res.ok(user.toJSON());
+          load_rooms(user)
+            .then(function(rooms){
+              var r = rooms;
+              var u = Object.assign({},user);
+              delete u.password;
+              delete u.rooms;
+              u['rooms'] = r;
+              return res.ok(u);
+            });
         }else{
           return res.ok(WRONG_PASS);
         }
       }
+    })
+    .catch(function(err){
+      return res.negotiate(err);
     });
   },
   autoLogin : function(req, res){
@@ -59,24 +98,29 @@ module.exports = {
 
     User.findOne({username:identifier})
     .populate('rooms')
-    .exec(function(err, user){
-      if (err) return res.negotiate(err);
-      if(!user){
-        User.findOne({email:identifier})
-        .populate('rooms')
-        .exec(function(err, user){
-          if (err) return res.negotiate(err);
-          if (user){
-            handle(req,user);
-            set_online(user.username);
-            res.ok(USER);
-          }
-        })
-      }else{
-        handle(req,user);
-        set_online(user.username);
-        res.ok(USER);
-      }
+    .then(function(user){
+        if (err)
+        if(!user){
+          User.findOne({email:identifier})
+          .populate('rooms')
+          .then(function(user){
+              if (user){
+                handle(req,user);
+                set_online(req,user);
+                res.ok(user);
+              }
+            })
+          .catch(function(err){
+            return res.negotiate(err);
+          });
+        }else{
+          handle(req,user);
+          set_online(req,user);
+          res.ok(user);
+        }
+      })
+    .catch(function(err){
+      return res.negotiate(err);
     });
   },
   register : function(req, res){
@@ -98,7 +142,7 @@ module.exports = {
       // If there was an error, we negotiate it.
       if (err) return res.negotiate(err);
       handle(req,newUser);
-      set_online(user.username);
+      set_online(req,newUser);
       return res.ok(newUser.toJSON());
     })
   },
