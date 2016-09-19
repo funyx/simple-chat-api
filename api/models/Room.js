@@ -15,7 +15,7 @@ module.exports = {
     user_ids: 'array',
     messages: {
       collection: 'message',
-      via: 'author'
+      via: 'room'
     },
 		users: {
       collection: 'user',

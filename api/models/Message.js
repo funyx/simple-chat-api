@@ -6,10 +6,11 @@ module.exports = {
       primaryKey: true,
       autoIncrement: true
     },
-		roomUid: {
+		room: {
       model: 'room',
       foreignKey: 'uid'
     },
+    roomUid: 'string',
     uid: 'string',
     author: {
       model: 'user'

@@ -42,11 +42,21 @@ module.exports.routes = {
   'post /users/online': 'UserController.online',
   'post /room/init': 'RoomController.init',
   'post /room/message': 'RoomController.message',
-  'post /room/messages': 'RoomController.getMessages'
+  'post /room/messages': 'RoomController.getMessages',
   // 'post /room/:roomId/users': 'RoomController.join',
   // 'delete /room/:roomId/users': 'RoomController.leave'
 
+  'get /rooms'          : 'RoomController.all',
+  'get /rooms/:uid'     : 'RoomController.one',
+  'post /rooms'         : 'RoomController.create',
+  'put /rooms/:uid'     : 'RoomController.update',
+  'delete /rooms/:uid'  : 'RoomController.remove',
 
+  'get /rooms/:roomUid/messages'                : 'MessageController.all',
+  'get /rooms/:roomUid/messages/:uid'           : 'MessageController.one',
+  'post /rooms/:roomUid/messages'               : 'MessageController.create',
+  'put /rooms/:roomUid/messages/:uid'           : 'MessageController.update',
+  'delete /rooms/:roomUid/messages/:uid'        : 'MessageController.remove'
   /***************************************************************************
   *                                                                          *
   * Custom routes here...                                                    *

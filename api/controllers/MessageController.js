@@ -2,9 +2,13 @@ var GUID = require('guid');
 module.exports = {
   all : function( req, res ){
     var me = req.param('me');
-    Room.find({
-      participants : { 'like': `%${me}%` }
-    }).populate("users")
+    var roomUid = req.param('roomUid');
+    //  where: { name: 'foo' }, skip: 20, limit: 10, sort: 'name DESC' }
+    Message.find({
+      where : { roomUid : roomUid },
+      sort: 'createdAt DESC'
+    })
+    .populateAll()
     .exec(function(err,found){
       if(err) return res.negotiate(err);
       return res.ok(found);
@@ -15,20 +19,30 @@ module.exports = {
     var uid = req.param('uid');
     Room.findOne({
       uid : uid
-    }).populate("users")
+    }).populate("author")
+    .populate("room")
     .exec(function(err,found){
       if(err) return res.negotiate(err);
       return res.ok(found);
     });
   },
   create : function ( req, res ){
-    var users = req.param('users');
+    var author = req.param('author');
+    var content = req.param('content');
+    var room = req.param('room');
+    var roomUid = req.param('roomUid');
     var uid = GUID.create().value;
-    var participants = users.sort().join(',');
-    Room.create({uid:uid,users:users,participants:participants})
-    .then(function(room){
-      Room.findOne(room.id).populate("users").then(function(room){
-          return res.ok(room);
+    var newMsg = {
+      uid:uid,
+      room:room,
+      roomUid:roomUid,
+      author:author,
+      content:content
+    };
+    Message.create(newMsg)
+    .then(function(message){
+      Message.findOne(message.id).populateAll().then(function(message){
+        return res.ok(message);
       });
     })
   },
