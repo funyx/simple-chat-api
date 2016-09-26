@@ -10,6 +10,9 @@
  * http://sailsjs.org/#!/documentation/reference/sails.config/sails.config.sockets.html
  */
 
+
+var ObjectID = require('mongodb').ObjectID;
+
 module.exports.sockets = {
 
 
@@ -106,13 +109,23 @@ module.exports.sockets = {
   * app's security.                                                          *
   *                                                                          *
   ***************************************************************************/
-  beforeConnect: function(handshake, cb) {
-    // console.log("CONNECT handshake", handshake.headers);
-    // `true` allows the connection
-    return cb(null, true);
-
-    // (`false` would reject the connection)
-  },
+  // beforeConnect: function(handshake, cb) {
+  //   try {
+  //     console.log(sails.sockets.getId(handshake));
+  //     var sessionId = sails.session.parseSessionIdFromCookie(handshake.headers.cookie);
+  //     sails.session.get(sessionId,function(err,session){
+  //       if(session.user && session.user.id){
+  //         var cookies = handshake;
+  //         // console.log(`${session.user.username} is online socket : `,cookies);
+  //       }else{
+  //         console.log(`Anonymous user is online`);
+  //       }
+  //     });
+  //     return cb(null, true);
+  //   } catch (e) {
+  //     return cb(null, true);
+  //   }
+  // },
 
 
   /***************************************************************************
@@ -125,31 +138,57 @@ module.exports.sockets = {
   ***************************************************************************/
   // This custom onDisconnect function will be run each time a socket disconnects
   afterDisconnect: function(session, socket, cb) {
-      // once external (not local memory) storage/db is used for storing sessions this will be resolved
-      // sails doesnt support session data / sockets properly while using memory as a storage
-      // var sessionId = socket.handshake.headers.cookie.replace('sails.sid=','');
-      // sails.session.get(sessionId,function(s){
-      //     console.log('byebye',sessionId,s);
-      // });
-      // try {
-        // Look up the user ID using the connected socket
-      //   var userId = session.user.id;
-      //   var socketId = session.socketId[sails.sockets.getId(socket)];
-      //   // Get the user instance
-      //   User.update({id:userId},{is_online:false}).exec(function(err, user) {
-      //
-      //     if (err) {return cb();}
-      //     // emit user offline
-      //     sails.sockets.blast('user_logged_in', {
-      //       msg: 'User #' + u.id + ' just logged in.',
-      //       user: u
-      //     }, req);
-      //   });
-      // } catch (e) {
-      //   console.log("Error on socket disconnect: ", e);
-        return cb();
-      // }
-
+    try {
+      var THE_SOCKET = sails.sockets.getId(socket);
+      // if we have a set user object stored in the session
+      if(session.user){
+        // if we have the socket id stored in the session
+        if(session.user.sockets.indexOf(THE_SOCKET)!=-1){
+          // first remove it from session.user.sockets
+          var newSocks = new Array;
+          for(var i in session.user.sockets){
+            // console.log(i,session.user.sockets[i]!=THE_SOCKET);
+            if(session.user.sockets[i]!=THE_SOCKET) newSocks.push(session.user.sockets[i]);
+          }
+          session.user.sockets = newSocks;
+          // then count if we have no open sockets left BUT a session.user.id set
+          if(session.user.sockets.length===0 && session.user.id){
+            // if not update the user status
+            // var where = { id: new ObjectID(session.user.id) };
+            User.native(function (err, collection) {
+              collection.update(
+                { _id : new ObjectID(session.user.id) },
+                { $set :
+                  { is_online : false,
+                    last_seen : new Date().toISOString()
+                  }
+                }
+              ).then(function(result){
+                console.log(`${session.user.username} is offline socket : ${THE_SOCKET}`);
+                var user_copy = Object.assign({},session.user);
+                // add the session id
+                user_copy['session_id'] = sails.session.parseSessionIdFromCookie(socket.handshake.headers.cookie);
+                delete user_copy.messages;
+                delete user_copy.rooms;
+                delete user_copy.sockets;
+                // emit user offline
+                sails.sockets.blast('user_offline', {
+                  msg: 'User #' + user_copy.id + ' went offline.',
+                  user: user_copy
+                });
+                return cb();
+              },function(e){
+                console.log(e);
+              });
+            });
+          }
+        }
+      }
+      return cb();
+    } catch (e) {
+      console.log(e);
+      return cb();
+    }
   }
 
   /***************************************************************************

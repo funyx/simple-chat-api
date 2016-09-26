@@ -1,27 +1,15 @@
-var handle = function(req,user){
-  var socketId = sails.sockets.getId(req);
-  req.session.user = user;
-  req.session.user['sockets'] = [socketId];
-  User.subscribe(req, user, 'SYS_MESSAGE');
-  User.watch(req);
-  Room.watch(req);
-  User.publishCreate(user, req);
-}
-var set_online = function(req,user){
-  User.update({username:user.username},{is_online:true}).exec(function afterwards(err, updated){
-    if (err) {
-      console.log(`error updating ${u.username}->is_online`, err);
-      return;
-    }
-    var u = Object.assign({},user);
-    delete u.password;
-    sails.sockets.blast('user_logged_in', {
-      msg: 'User #' + u.id + ' just logged in.',
-      user: u
-    }, req);
-    console.log(`${u.username} is now online`);
-  });
+var ObjectID = require('mongodb').ObjectID;
 
+var handle = function(req,user){
+  // var socket_id = sails.sockets.getId(req);
+  // // if in some case we dont have the user object preset add the sockets
+  // if(!(req.session.user)){
+  //   user.sockets = [socket_id]
+  // }
+  req.session.user = Object.assign(req.session.user,user);
+  User.watch(req);
+  // Room.watch(req);
+  // User.publishCreate(user, req);
 }
 var load_rooms = function(u){
   var uids=[];
@@ -37,6 +25,52 @@ var load_rooms = function(u){
   return Room.find({uid:uids}).populate('users')
 };
 module.exports = {
+  // this method is called after socket connects to the backend
+  // the purpose is to keep all the sockets openned fot the session in one place
+  // we can easily manipulate them afterwards
+  // the sockets are removed automatically in config/sockets.js :: afterDisconnect
+  sync : function(req,res){
+    if(!req.isSocket) res.notFound();
+    var socket_id = '/#'+req.param('id');
+    //check if we have a user
+    if(req.session.user){
+        if(!(req.session.user.sockets)){
+          req.session.user.sockets = new Array;
+        }
+        if(req.session.user.sockets.indexOf(socket_id)===-1){
+          req.session.user.sockets.push(socket_id);
+          req.session.save();
+        }
+        // if we have an existing user update the db
+        if(req.session.user.id){
+          User.native(function (err, collection) {
+            collection.update(
+              { _id : new ObjectID(req.session.user.id) },
+              { $set :
+                { is_online : true }
+              }
+            ).then(function(result){
+              console.log(`${req.session.user.username} is online socket : ${socket_id} SOCKETS OPEN : ${req.session.user.sockets.length}`);
+              var user_copy = Object.assign({},req.session.user);
+              user_copy['session_id'] = sails.session.parseSessionIdFromCookie(req.headers.cookie);
+              delete user_copy.messages;
+              delete user_copy.rooms;
+              delete user_copy.sockets;
+              // emit user online
+              sails.sockets.blast('user_online', {
+                msg: 'User #' + req.session.user.id + ' is online.',
+                user: req.session.user
+              });
+            },function(error){
+              console.log('error',error)
+            })
+          });
+        }
+    }else{
+      req.session.user = { sockets : [socket_id] };
+      req.session.save();
+    }
+  },
   login : function(req, res){
     var identifier = req.param('identifier'),
         password = req.param('password'),
@@ -51,7 +85,7 @@ module.exports = {
             if (user){
               if(user.password === password){
                 handle(req,user);
-                set_online(req,user);
+                // set_online(req,user);
                 load_rooms(user)
                   .then(function(rooms){
                     var r = rooms;
@@ -106,7 +140,7 @@ module.exports = {
           .then(function(user){
               if (user){
                 handle(req,user);
-                set_online(req,user);
+                // set_online(req,user);
                 res.ok(user);
               }
             })
@@ -115,7 +149,7 @@ module.exports = {
           });
         }else{
           handle(req,user);
-          set_online(req,user);
+          // set_online(req,user);
           res.ok(user);
         }
       })
@@ -142,7 +176,7 @@ module.exports = {
       // If there was an error, we negotiate it.
       if (err) return res.negotiate(err);
       handle(req,newUser);
-      set_online(req,newUser);
+      // set_online(req,newUser);
       return res.ok(newUser.toJSON());
     })
   },

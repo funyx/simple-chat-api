@@ -26,6 +26,7 @@ module.exports = {
     timezone: 'string',
     avatar: 'string',
     is_online: 'boolean',
+    last_seen: 'datetime',
     messages: {
       collection: 'message',
       via: 'author'
